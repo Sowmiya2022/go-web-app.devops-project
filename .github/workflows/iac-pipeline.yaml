@@ -1,0 +1,64 @@
+name: 'Terraform IaC'
+
+# This workflow is triggered on pushes to the 'main' branch
+# but only when changes are made to the 'Terraform' directory.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Terraform/**'
+
+jobs:
+  terraform:
+    name: 'Terraform Plan & Apply'
+    runs-on: ubuntu-latest
+    # We will use a GitHub Secret to store the GCP service account key.
+    env:
+      GOOGLE_CREDENTIALS: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+      # Pass Terraform variables securely via environment variables
+      TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_cluster_name: my-app-cluster
+      TF_VAR_region: us-central1
+      TF_VAR_zone: us-central1-c
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # This step is crucial for the workflow to make commits
+      # after 'apply' is run.
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.1.9 # Use a stable version
+
+      # Write the GCP credentials to a file that Terraform can use.
+      - name: Authenticate to GCP
+        id: auth
+        run: |
+          echo "${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}" > gcloud-key.json
+          export GOOGLE_APPLICATION_CREDENTIALS=gcloud-key.json
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+        working-directory: ./Terraform
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color
+        working-directory: ./Terraform
+        
+      - name: Terraform Apply
+        id: apply
+        # We will require a manual approval step for the 'apply' command.
+        # This is a best practice for production environments.
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve -no-color
+        working-directory: ./Terraform
