@@ -20,3 +20,12 @@
 # Go workspace file
 go.work
 go.work.sum
+
+# Ignore Terraform credentials
+Terraform/key.json
+
+# Ignore large files like the terraform provider
+Terraform/.terraform/providersi/
+
+# Ignore the entire .terraform directory
+.terraform/
